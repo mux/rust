@@ -2,6 +2,8 @@ use std::cmp::min;
 use std::collections::HashMap;
 use std::fmt;
 
+use itertools::Either;
+
 type Color = u32;
 type Column = Vec<Color>;
 
@@ -79,7 +81,7 @@ impl Puzzle {
 
         for (i, col) in self.state.iter().enumerate() {
             // Adding the number of moves to the score to promote states that are not stuck.
-            score += self.column_moves(i).len();
+            score += self.column_moves(i).count();
             // We use self.state.len() as a multiplier to ensure the various conditions below
             // (empty columns, columns with just one color, columns fully sorted with all the
             // entries of that color) dominate over just being able to move items.
@@ -108,35 +110,28 @@ impl Puzzle {
         Score::Score(score)
     }
 
-    fn column_moves(&self, col: usize) -> Vec<Move> {
-        let mut moves = Vec::new();
+    fn column_moves(&self, col: usize) -> impl Iterator<Item = Move> {
         let src = &self.state[col];
-
         let Some(&c) = src.last() else {
-            return Vec::new();
+            return Either::Left(std::iter::empty());
         };
 
-        for (i, dst) in self.state.iter().enumerate() {
-            if i == col {
-                continue;
-            }
-            if dst.last().is_some_and(|&c2| c2 != c) {
-                continue;
-            }
-            if dst.len() < self.column_size {
-                moves.push(Move(col, i))
-            }
-        }
-        moves
+        Either::Right(
+            self.state
+                .iter()
+                .enumerate()
+                .filter(move |(i, _)| *i != col)
+                .filter(move |(_, dst)| dst.last().is_none_or(|&c2| c2 == c))
+                .filter(|(_, dst)| dst.len() < self.column_size)
+                .map(move |(i, _)| Move(col, i)),
+        )
     }
 
-    fn moves(&self) -> Vec<Move> {
-        let mut moves = Vec::new();
-
-        for i in 0..self.state.len() {
-            moves.extend(&self.column_moves(i));
-        }
-        moves
+    fn moves(&self) -> impl Iterator<Item = Move> {
+        self.state
+            .iter()
+            .enumerate()
+            .flat_map(|(i, _)| self.column_moves(i))
     }
 
     fn do_move(&mut self, Move(from, to): Move) {
