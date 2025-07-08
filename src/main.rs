@@ -1,4 +1,3 @@
-use std::cmp::Ordering;
 use std::cmp::min;
 use std::collections::HashMap;
 use std::fmt;
@@ -6,26 +5,10 @@ use std::fmt;
 type Color = u32;
 type Column = Vec<Color>;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Score {
-    Win,
     Score(usize),
-}
-
-impl Ord for Score {
-    fn cmp(&self, other: &Self) -> Ordering {
-        match (self, other) {
-            (Score::Win, _) => Ordering::Greater,
-            (_, Score::Win) => Ordering::Less,
-            (Score::Score(s1), Score::Score(s2)) => s1.cmp(s2),
-        }
-    }
-}
-
-impl PartialOrd for Score {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
+    Win,
 }
 
 #[derive(Debug, Clone)]
@@ -182,7 +165,7 @@ impl Puzzle {
 
         let mut children = HashMap::new();
 
-        for &m in &self.moves() {
+        for m in self.moves() {
             let mut game = self.clone();
             game.do_move(m);
             let map = game.moves_map(depth - 1);
@@ -199,7 +182,7 @@ impl Puzzle {
 
     fn solve(&self, depth: u32, iterations: u32) -> Vec<Move> {
         let mut count = 0;
-        let mut game = &self.clone();
+        let mut game = self;
         let mut moves = Vec::new();
         let mut tree;
         while count < iterations {
