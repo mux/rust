@@ -2,8 +2,6 @@ use std::cmp::min;
 use std::collections::HashMap;
 use std::fmt;
 
-use itertools::Either;
-
 type Color = u32;
 type Column = Vec<Color>;
 
@@ -113,10 +111,10 @@ impl Puzzle {
     fn column_moves(&self, col: usize) -> impl Iterator<Item = Move> {
         let src = &self.state[col];
         let Some(&c) = src.last() else {
-            return Either::Left(std::iter::empty());
+            return None.into_iter().flatten();
         };
 
-        Either::Right(
+        Some(
             self.state
                 .iter()
                 .enumerate()
@@ -125,6 +123,8 @@ impl Puzzle {
                 .filter(|(_, dst)| dst.len() < self.column_size)
                 .map(move |(i, _)| Move(col, i)),
         )
+        .into_iter()
+        .flatten()
     }
 
     fn moves(&self) -> impl Iterator<Item = Move> {
@@ -229,7 +229,14 @@ impl MoveTree {
 fn main() {
     let mut p = Puzzle::new(
         4,
-        &[vec![1, 2, 3, 4], vec![1, 2, 3, 4], vec![], vec![], vec![]],
+        &[
+            vec![1, 2, 3, 4],
+            vec![1, 2, 3, 4],
+            vec![1, 2, 3, 4],
+            vec![],
+            vec![],
+            vec![],
+        ],
     );
     let moves = p.solve(5, 100);
     println!("Initial state: {p}");
