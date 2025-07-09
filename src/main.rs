@@ -110,21 +110,23 @@ impl Puzzle {
 
     fn column_moves(&self, col: usize) -> impl Iterator<Item = Move> {
         let src = &self.state[col];
-        let Some(&c) = src.last() else {
-            return None.into_iter().flatten();
-        };
+        let iter;
 
-        Some(
-            self.state
-                .iter()
-                .enumerate()
-                .filter(move |(i, _)| *i != col)
-                .filter(move |(_, dst)| dst.last().is_none_or(|&c2| c2 == c))
-                .filter(|(_, dst)| dst.len() < self.column_size)
-                .map(move |(i, _)| Move(col, i)),
-        )
-        .into_iter()
-        .flatten()
+        if let Some(&c) = src.last() {
+            iter = Some(
+                self.state
+                    .iter()
+                    .enumerate()
+                    .filter(move |(i, _)| *i != col)
+                    .filter(move |(_, dst)| dst.last().is_none_or(|&c2| c2 == c))
+                    .filter(|(_, dst)| dst.len() < self.column_size)
+                    .map(move |(i, _)| Move(col, i)),
+            );
+        } else {
+            iter = None;
+        }
+
+        iter.into_iter().flatten()
     }
 
     fn moves(&self) -> impl Iterator<Item = Move> {
