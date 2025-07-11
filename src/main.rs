@@ -55,22 +55,24 @@ struct MoveTree {
 
 impl Puzzle {
     fn new(column_size: usize, init: &[Vec<u32>]) -> Puzzle {
-        let mut p = Puzzle {
-            column_size,
-            colors_count: HashMap::new(),
-            state: Vec::new(),
-        };
+        let mut colors_count = HashMap::new();
+        let mut state = Vec::new();
 
         for col in init {
             let mut vec = Vec::with_capacity(column_size);
             for &c in &col[..min(column_size, col.len())] {
-                let entry = p.colors_count.entry(c).or_insert(0);
+                let entry = colors_count.entry(c).or_insert(0);
                 *entry += 1;
                 vec.push(c);
             }
-            p.state.push(vec);
+            state.push(vec);
         }
-        p
+
+        Puzzle {
+            column_size,
+            colors_count,
+            state,
+        }
     }
 
     fn rank(&self) -> Score {
