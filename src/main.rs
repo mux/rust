@@ -1,11 +1,12 @@
 use std::cmp::min;
 use std::collections::HashMap;
+use std::collections::VecDeque;
 use std::fmt;
 
 type Color = u32;
 type Column = Vec<Color>;
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum Score {
     Score(usize),
     Win,
@@ -20,7 +21,6 @@ struct Puzzle {
 
 impl fmt::Display for Puzzle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f)?;
         for i in 0..self.column_size {
             if i > 0 {
                 writeln!(f)?;
@@ -47,14 +47,8 @@ impl fmt::Display for Puzzle {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 struct Move(usize, usize);
 
-#[derive(Debug)]
-struct MoveTree {
-    game: Puzzle,
-    children: HashMap<Move, MoveTree>,
-}
-
 impl Puzzle {
-    fn new(column_size: usize, init: &[Vec<u32>]) -> Puzzle {
+    fn new(column_size: usize, init: &[Vec<u32>]) -> Self {
         let mut colors_count = HashMap::new();
         let mut state = Vec::new();
 
@@ -150,83 +144,55 @@ impl Puzzle {
         }
     }
 
-    fn moves_tree(&self, depth: u32) -> MoveTree {
-        MoveTree {
-            game: self.clone(),
-            children: self.moves_map(depth),
-        }
-    }
-
-    fn moves_map(&self, depth: u32) -> HashMap<Move, MoveTree> {
+    fn dfs(&self, depth: u32, score: Score) -> (Score, VecDeque<Move>) {
         if depth == 0 {
-            return HashMap::new();
+            return (score, VecDeque::new());
         }
 
-        let mut children = HashMap::new();
-
+        // Evaluate all nodes at the given depth
+        let mut best_score = score;
+        let mut best_moves = VecDeque::new();
         for m in self.moves() {
             let mut game = self.clone();
             game.do_move(m);
-            let map = game.moves_map(depth - 1);
-            children.insert(
-                m,
-                MoveTree {
-                    game,
-                    children: map,
-                },
-            );
+            let (child_score, mut moves) = game.dfs(depth - 1, game.rank());
+            if child_score > best_score {
+                best_score = child_score;
+                moves.push_front(m);
+                best_moves = moves;
+
+                if let Score::Win = child_score {
+                    break;
+                }
+            }
         }
-        children
+
+        (best_score, best_moves)
     }
 
-    fn solve(&self, depth: u32, iterations: u32) -> Vec<Move> {
+    // IDDFS
+    fn solve(&self, max_depth: u32, iterations: u32) -> VecDeque<Move> {
+        let mut all_moves = VecDeque::new();
         let mut count = 0;
-        let mut game = self;
-        let mut moves = Vec::new();
-        let mut tree;
+        let mut game = self.clone();
         while count < iterations {
-            tree = game.moves_tree(depth);
-            let (new_game, score, next_moves) = tree.find_best();
-            moves.extend(&next_moves);
-
-            if let Score::Win = score {
-                break;
+            let mut best_moves = VecDeque::new();
+            for d in 0..max_depth {
+                let (score, moves) = game.dfs(d, game.rank());
+                if let Score::Win = score {
+                    all_moves.extend(moves);
+                    println!("Found a winner in {} moves.", all_moves.len());
+                    return all_moves;
+                }
+                best_moves = moves;
             }
-            game = new_game;
+            for m in &best_moves {
+                game.do_move(*m);
+            }
+            all_moves.extend(best_moves);
             count += 1;
         }
-        moves
-    }
-}
-
-impl MoveTree {
-    fn find_best(&self) -> (&Puzzle, Score, Vec<Move>) {
-        let game = &self.game;
-        let score = game.rank();
-
-        // Using matches!() here because you cannot group if let with another condition
-        // using the || operator (although it is allowed with &&).
-        if matches!(score, Score::Win) || self.children.is_empty() {
-            return (game, score, Vec::new());
-        }
-
-        let mut best_score = Score::Score(0);
-        let mut best_moves = Vec::new();
-        let mut best_game = game;
-
-        for (&m, tree) in &self.children {
-            let (new_game, score, moves) = tree.find_best();
-            if score > best_score {
-                best_score = score;
-                best_moves = vec![m];
-                best_moves.extend(&moves);
-                best_game = new_game;
-            }
-            if let Score::Win = best_score {
-                break;
-            }
-        }
-        (best_game, best_score, best_moves)
+        all_moves
     }
 }
 
@@ -235,18 +201,21 @@ fn main() {
         4,
         &[
             vec![1, 2, 3, 4],
-            vec![1, 2, 3, 4],
-            vec![1, 2, 3, 4],
-            vec![],
+            vec![3, 5, 3, 1],
+            vec![6, 1, 2, 5],
+            vec![6, 3, 2, 5],
+            vec![6, 5, 4, 6],
+            vec![2, 1, 4, 4],
             vec![],
             vec![],
         ],
     );
     let moves = p.solve(5, 100);
-    println!("Initial state: {p}");
+    println!("Initial state:\n{p}");
     for m in moves {
-        println!("{m:?}");
+        print!("{m:?} -> ");
         p.do_move(m);
-        println!("-> {p}");
+        println!("{:?}", p.rank());
+        println!("{p}");
     }
 }
